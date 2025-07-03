@@ -25,15 +25,16 @@ _(No installation needed — try it instantly!)_
 
 Iris-ML/
 │
-├── app.py # 🌐 Main Streamlit web app
-├── train_model.py # 🧠 Script to train & save Random Forest model
-├── predictor.py # 🔮 Loads model and returns predictions
-├── utils.py # 📊 Charts & report helpers
-├── sample_input.csv # 📥 Sample input CSV for batch prediction
-├── requirements.txt # 📦 Python dependencies
-├── README.md # 📘 Project documentation
+├── app.py                  # 🌐 Main Streamlit web app
+├── train_model.py          # 🧠 Script to train & save Random Forest model
+├── predictor.py            # 🔮 Loads model and returns predictions
+├── utils.py                # 📊 Charts & report helpers
+├── sample_input.csv        # 📥 Sample input CSV for batch prediction
+├── requirements.txt        # 📦 Python dependencies
+├── README.md               # 📘 Project documentation
 └── model/
-└── iris_rf.pkl # ✅ Trained Random Forest model
+    └── iris_rf.pkl         # ✅ Trained Random Forest model
+
 
 yaml
 Copy
@@ -66,7 +67,12 @@ Edit
 ---
 
 ## 📸 Screenshots *(optional)*  
-> Add your screenshots here for UI preview (e.g., input form, prediction output, chart).
+>![image](https://github.com/user-attachments/assets/fb06dce0-2089-4609-8286-53747b67bd37)
+![image](https://github.com/user-attachments/assets/e47b9cbd-8e0c-40e5-ba13-b5d48eaee85d)
+![image](https://github.com/user-attachments/assets/12de46f8-5a03-4148-8845-5b6cf92a8c81)
+
+
+
 
 ---
 
