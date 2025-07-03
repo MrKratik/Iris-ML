@@ -41,8 +41,8 @@ This project demonstrates the deployment of a machine learning model for classif
 
 ## Author
 
-- [Your Name]
-- [Contact Information]
+- Kratik jain
+- kratikjain121@gmail.com 
 
 ## License
 
