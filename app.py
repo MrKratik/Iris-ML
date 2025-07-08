@@ -1,74 +1,133 @@
-# app.py
 import streamlit as st
 import numpy as np
 import pandas as pd
-from predictor import load_model, predict
-from utils import plot_confidence_bar, generate_prediction_report, plot_pairwise
-import seaborn as sns
+import joblib
+import cv2
+from PIL import Image
+from skimage.feature import local_binary_pattern
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="ML Deployment App 🚀", layout="wide")
-st.title("🌸 Iris Classifier — Powered by Random Forest")
+# Page config
+st.set_page_config(page_title="🌿 Plant Disease App", layout="wide")
 
-# Load model
-model_path = "model/iris_rf.pkl"
-model = load_model(model_path)
-class_names = ['Setosa', 'Versicolor', 'Virginica']
+# Load all models
+models = {
+    "Random Forest": joblib.load("plant_disease_rf_model.joblib"),
+    "SVM (RBF Kernel)": joblib.load("plant_disease_svm_model.joblib"),
+    "Gradient Boosting": joblib.load("plant_disease_gb_model.joblib"),
+    "Voting Ensemble": joblib.load("plant_disease_voting_model.joblib"),
+    "KNN": joblib.load("plant_disease_knn_model.joblib"),
+    "Logistic Regression": joblib.load("plant_disease_logreg_model.joblib")
+}
 
-# Choose input type
-input_mode = st.radio("Choose input method:", ["Manual Input", "Upload CSV"], horizontal=True)
+label_map = {0: 'Healthy', 1: 'Multiple Diseases', 2: 'Rust', 3: 'Scab'}
 
-if input_mode == "Manual Input":
-    col1, col2 = st.columns(2)
-    with col1:
-        sepal_length = st.slider("Sepal Length", 4.0, 8.0, 5.1)
-        petal_length = st.slider("Petal Length", 1.0, 7.0, 1.4)
-    with col2:
-        sepal_width = st.slider("Sepal Width", 2.0, 4.5, 3.5)
-        petal_width = st.slider("Petal Width", 0.1, 2.5, 0.2)
+# Feature Extraction
+@st.cache_data
+def extract_features(pil_img):
+    img = np.array(pil_img.resize((128, 128)))
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    mean_rgb = img.mean(axis=(0, 1))
+    std_rgb = img.std(axis=(0, 1))
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    lbp = local_binary_pattern(gray, P=8, R=1, method='uniform')
+    lbp_hist, _ = np.histogram(lbp.ravel(), bins=np.arange(0, 11), range=(0, 10))
+    lbp_hist = lbp_hist.astype("float") / (lbp_hist.sum() + 1e-6)
+    return np.hstack([mean_rgb, std_rgb, lbp_hist])
 
-    input_array = np.array([[sepal_length, sepal_width, petal_length, petal_width]])
+# --- Page Sections ---
+def show_about():
+    st.title("🌿 About This Project")
+    st.markdown("""
+    This app classifies and detects plant leaf diseases using traditional ML models (no deep learning). 
+    It uses handcrafted features like color stats and Local Binary Patterns (LBP) for classification.
 
-    if st.button("🔍 Predict"):
-        prediction, proba = predict(model, input_array)
-        st.success(f"🎯 Prediction: {class_names[prediction]}")
-        st.bar_chart(plot_confidence_bar(class_names, proba))
+    **Supported Diseases:**
+    - Healthy
+    - Multiple Diseases
+    - Rust
+    - Scab
 
-        report = generate_prediction_report(input_array, prediction, class_names, proba)
-        st.download_button("📥 Download Report", report.to_csv(index=False), "report.csv", "text/csv")
+    **Tech Used:** Streamlit, OpenCV, scikit-learn
+    """)
 
-else:
-    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+
+def show_detection():
+    st.title("🩺 Plant Disease Detection")
+    uploaded_file = st.file_uploader("Upload a plant leaf image", type=["jpg", "png", "jpeg"], key="detect")
     if uploaded_file:
-        data = pd.read_csv(uploaded_file)
-        st.dataframe(data.head())
-        results = []
-        probs = []
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Leaf", use_column_width=True)
+        features = extract_features(image).reshape(1, -1)
+        model = models["Voting Ensemble"]
+        prediction = model.predict(features)[0]
+        probs = model.predict_proba(features)[0]
+        confidence = probs[prediction] * 100
+        st.success(f"Prediction: **{label_map[prediction]}**")
+        st.info(f"Confidence: {confidence:.2f}%")
 
-        for _, row in data.iterrows():
-            pred, proba = predict(model, np.array([row]))
-            results.append(class_names[pred])
-            probs.append(max(proba))
 
-        data["Prediction"] = results
-        data["Confidence"] = probs
-        st.success("✅ Batch predictions complete!")
-        st.dataframe(data)
+def show_classification():
+    st.title("🧠 Plant Disease Classification")
+    model_choice = st.selectbox("Choose Model", list(models.keys()))
+    model = models[model_choice]
+    uploaded_file = st.file_uploader("Upload a plant leaf image", type=["jpg", "png", "jpeg"], key="classify")
+    if uploaded_file:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Leaf", use_column_width=True)
+        features = extract_features(image).reshape(1, -1)
+        prediction = model.predict(features)[0]
+        probs = model.predict_proba(features)[0]
+        confidence = probs[prediction] * 100
+        st.success(f"Predicted Class: **{label_map[prediction]}**")
+        st.info(f"Confidence: {confidence:.2f}%")
 
-        st.download_button("📥 Download Batch Results", data.to_csv(index=False), "batch_results.csv", "text/csv")
+        # Plot confidence
+        st.subheader("Model Confidence")
+        fig, ax = plt.subplots()
+        ax.bar(label_map.values(), probs, color="#66BB6A")
+        ax.set_ylabel("Probability")
+        ax.set_ylim([0, 1])
+        st.pyplot(fig)
 
-# Visualization
-st.subheader("📊 Visualize the Dataset")
-iris = sns.load_dataset("iris")
-viz_option = st.selectbox("Choose Plot", ["Pairplot", "Sepal vs Petal", "Species Count"])
 
-if viz_option == "Pairplot":
-    st.pyplot(plot_pairwise(iris))
-elif viz_option == "Sepal vs Petal":
-    fig, ax = plt.subplots()
-    sns.scatterplot(data=iris, x="sepal_length", y="petal_length", hue="species", ax=ax)
-    st.pyplot(fig)
+def show_treatment():
+    st.title("🌾 Treatment Guide")
+    st.markdown("""
+    ### 🍏 Apple and Pear Scab
+    - **Symptoms**: Olive-green or black spots on leaves and fruits
+    - **Treatment**: Use fungicides like Mancozeb; prune affected areas
+
+    ### 🌿 Multiple Diseases
+    - **General Advice**: Improve drainage and airflow, avoid overwatering
+
+    ### 🍂 Rust
+    - **Symptoms**: Yellow-orange spots on underside of leaves
+    - **Treatment**: Use sulfur-based fungicides early in the season
+
+    ### 🛡️ Healthy
+    - Your plant appears healthy! Maintain regular care.
+    """)
+
+
+# --- Sidebar Navigation ---
+st.sidebar.title("🔍 Navigation")
+activity = st.sidebar.selectbox("Select Activity", ["About Project", "Plant Disease"])
+if activity == "Plant Disease":
+    task = st.sidebar.radio("Type", ["Detection", "Classification", "Treatment"])
 else:
-    fig, ax = plt.subplots()
-    sns.countplot(data=iris, x="species", ax=ax)
-    st.pyplot(fig)
+    task = None
+
+# --- Render section ---
+if activity == "About Project":
+    show_about()
+elif task == "Detection":
+    show_detection()
+elif task == "Classification":
+    show_classification()
+elif task == "Treatment":
+    show_treatment()
+
+# --- Footer ---
+st.markdown("""<hr style="border:1px solid gray">""", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center; color: gray;'>Made by Kratik Jain | Powered by Streamlit</div>", unsafe_allow_html=True)
